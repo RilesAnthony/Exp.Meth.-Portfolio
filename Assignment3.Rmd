@@ -1,0 +1,313 @@
+---
+title: "Assignment3"
+author: "RF"
+date: "3/6/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+setwd("C:/Users/tamec/Desktop/Programming/Git/Semester 4/Assignment3")
+library(pacman)
+p_load(readr,groupdata2,ggplot2,tidyverse,data.table,lmerTest, jpeg, grid, brms, rethinking,gridGraphics)
+df = read.csv("Assignment3Data.csv")
+
+
+
+
+```
+
+
+## Multivariate linear models
+
+In this assignment you will investigate the relation between different aspects of IQ and symptom severity in ASD (as measured by ADOS). The assignment is meant to make you practice on linear models, multiple predictors and interactions.
+
+The data you will use is the outcome of the psychological testing of the children you analyzed in methods 3.
+Data: https://www.dropbox.com/s/hom2qnmp9hyfwmu/Assignment3Data.csv?dl=0
+The data consists of ChildID, gender, age, diagnosis (ASD), symptom severity (ADOS), several aspects of IQ (NonVerbal/Perceptual,Verbal,Social) and the visit at which the tests were administered. The questions should be answered by focusing on visit 1.
+
+The questions you will have to answer are:
+
+1. Assess the relation between symptom severity and IQ (focus on visit 1 and children with ASD) and report the model, a plot of the model, a couple of lines describing the quality of the model and interpreting the results. P.S. Should you scale? P.P.S. Don't forget to motivate your priors. P.P.P.S. At least one plot for results and a plot for quality of each model (here and in the next questions) would be appreciated.
+1.1. Verbal IQ and ADOS
+1.2. Non Verbal IQ and ADOS
+1.3. Social IQ and ADOS
+
+```{r}
+
+
+cor(v1A,  method = "pearson")
+#MOTIVATE YO'SELF
+
+# 0=td
+# 1=asd
+
+mean(v1A$VerbalIQ)
+
+colnames(df)
+v1A = subset(df, Visit == 1 & ASD == 1)
+v1A$ADOS = scale(v1A$ADOS) #alpha and beta are correlated?
+
+#VerbalIQ & ADOS
+v1A$VerbalIQ = scale(v1A$VerbalIQ, center = TRUE)
+
+qav1asd = map(
+  alist(
+    ADOS ~ dnorm(m ,s),
+    m <- a + b*VerbalIQ,
+    a ~ dnorm(0, 0.5), 
+    b ~ dnorm(0, 1),
+    s ~ dunif(0, 2)
+    ) ,
+  data=v1A)
+
+sidm=precis(qav1asd, corr = T)
+plot(sidm)
+
+plot(ADOS ~ VerbalIQ, data = v1A)
+abline(a=coef(qav1asd)["a"], b = coef(qav1asd) ["b"])
+
+###plot qav1asd
+
+#calculating values for the plot
+post1 = extract.samples(qav1asd) #posterior from samples 
+mu.link1 = function(VerbalIQ) post1$a + post1$b*VerbalIQ
+VIQ.seq1 = seq(from=min(v1A$VerbalIQ) , to=max(v1A$VerbalIQ) , by=0.1 )
+mu1 = sapply(VIQ.seq1 , mu.link1 )
+mu.mean1 = apply(mu1 , 2 , mean )
+mu.HPDI1 = apply(mu1 , 2 , HPDI , prob=0.89 )
+sim.VIQ1 = sim(qav1asd , data=list(VerbalIQ=VIQ.seq1) )
+VIQ.PI1 = apply(sim.VIQ1 , 2 , PI , prob=0.89 )
+
+plot( ADOS ~ VerbalIQ , v1A, col=col.alpha(rangi2,0.5) )
+# draw MAP line
+lines( VIQ.seq1 , mu.mean1 )
+# draw HPDI region for line
+shade( mu.HPDI1 , VIQ.seq1 ) 
+# draw PI region for simulated heights
+shade( VIQ.PI1 , VIQ.seq1 ) #89 PI
+
+#nonVerbalIQ & ADOS
+v1A$NonVerbalIQ = scale(v1A$NonVerbalIQ, center = T)
+
+qav1asd2 = map(
+  alist(
+    ADOS ~ dnorm(m ,s),
+    m <- a + b*NonVerbalIQ,
+    a ~ dnorm(0, 0.5), 
+    b ~ dnorm(0, 1),
+    s ~ dunif(0, 2)
+    ) ,
+  data=v1A)
+
+limvwb=precis(qav1asd2, corr = T)
+plot(limvwb)
+limvwb
+
+###plot qav1asd2
+
+#calculating values for the plot
+post2 = extract.samples(qav1asd2) #posterior from samples 
+mu.link2 = function(NonVerbalIQ) post2$a + post2$b*NonVerbalIQ
+VIQ.seq2 = seq(from=min(v1A$NonVerbalIQ) , to=max(v1A$NonVerbalIQ) , by=0.1 )
+mu2 = sapply(VIQ.seq2 , mu.link2 )
+mu.mean2 = apply(mu2 , 2 , mean )
+mu.HPDI2 = apply(mu2 , 2 , HPDI , prob=0.89 )
+sim.VIQ2 = sim(qav1asd2 , data=list(NonVerbalIQ=VIQ.seq2) )
+VIQ.PI2 = apply(sim.VIQ2 , 2 , PI , prob=0.89 )
+
+plot( ADOS ~ NonVerbalIQ , v1A, col=col.alpha(rangi2,0.5) )
+# draw MAP line
+lines( VIQ.seq2 , mu.mean2 )
+# draw HPDI region for line
+shade( mu.HPDI2 , VIQ.seq2 ) 
+# draw PI region for simulated heights
+shade( VIQ.PI2 , VIQ.seq2 ) #89 PI
+
+#SocialIQ & ADOS
+v1A$SocialIQ = scale(v1A$SocialIQ, center = T)
+
+qav1asd3 = map(
+  alist(
+    ADOS ~ dnorm(m, s),
+    m <- a + b*SocialIQ,
+    a ~ dnorm(0, 0.5), 
+    b ~ dnorm(0, 1),
+    s ~ dunif(0, 2)
+    ) ,
+  data=v1A)
+
+iiwmd=precis(qav1asd3, corr = T)
+plot(iiwmd)
+iiwmd
+
+plot(ADOS ~ SocialIQ, data = v1A)
+abline(a=coef(qav1asd3)["a"], b = coef(qav1asd3) ["b"])
+
+###plot qav1asd3
+
+#calculating values for the plot
+post3 = extract.samples(qav1asd3) #posterior from samples 
+mu.link3 = function(SocialIQ) post3$a + post3$b*SocialIQ
+VIQ.seq3 = seq(from=min(v1A$SocialIQ) , to=max(v1A$SocialIQ) , by=0.1 )
+mu3 = sapply(VIQ.seq3 , mu.link3 )
+mu.mean3 = apply(mu3 , 2 , mean )
+mu.HPDI3 = apply(mu3 , 2 , HPDI , prob=0.89 )
+sim.VIQ3 = sim(qav1asd3 , data=list(SocialIQ=VIQ.seq3) )
+VIQ.PI3 = apply(sim.VIQ3 , 2 , PI , prob=0.89 )
+
+plot3 = plot( ADOS ~ SocialIQ , v1A, col=col.alpha(rangi2,0.5) )
+# draw MAP line
+lines( VIQ.seq3 , mu.mean3 )
+# draw HPDI region for line
+shade( mu.HPDI3 , VIQ.seq3 ) 
+# draw PI region for simulated heights
+shade( VIQ.PI3 , VIQ.seq3 ) #89 PI
+
+```
+
+2. Do the different aspects of IQ account for different portions of the variance in ADOS? 
+2.1. Does it make sense to have all IQ measures in the same model? First write a few lines answering the question and motivating your answer, including a discussion as to what happens when you put all of them in the same model. Then build a model following your answer. If your answer is "no", you are not free, you still have to answer: are there alternative ways of answering the question?
+2.2. Build the model, assess its quality, write a few lines interpreting the results.
+
+```{r}
+
+qav1asd4 = map(
+  alist(
+    ADOS ~ dnorm(m, s),
+    m <- a + b1*VerbalIQ + b2*NonVerbalIQ + b3*SocialIQ,
+    a ~ dnorm(0, 0.5), 
+    b1 ~ dnorm(0, 0.5),
+    b2 ~ dnorm(0, 0.5),
+    b3 ~ dnorm(0, 0.5),
+    s ~ dunif(0, 2)
+    ) ,
+  data=v1A)
+
+gomc=precis(qav1asd4, corr = T)
+plot(gomc)
+
+
+post4 = extract.samples(qav1asd4) #posterior from samples 
+dens(post4$b1)
+dens(post4$b2)
+dens(post4$b3)
+
+b1=post4$b1
+b2=post4$b2
+b3=post4$b3
+
+ggplot(post4) +
+    geom_histogram(aes(b1), fill = "red", alpha = 0.2)+
+    geom_histogram(aes(b2), fill = "blue", alpha = 0.2)+
+    geom_histogram(aes(b3), fill = "green", alpha = 0.2)
+  
+  
+ggplot(post4 ,aes(b1)) +
+    geom_histogram(fill = "red", alpha = 0.2)
+
+```
+
+3. Let's now include also the TD children. Does it make sense to ask whether IQ and ADOS are related? Motivate your answer. In any case, if you wanted to build a model to answer that question, which model would you build? Run the model, assess its quality, write a few lines interpreting the results.
+
+```{r}
+
+df = df[ complete.cases(df) , ]
+df = na.omit(df) 
+df$ADOS = scale(df$ADOS)
+df$VerbalIQ = scale(df$VerbalIQ)
+df$NonVerbalIQ = scale(df$NonVerbalIQ)
+df$SocialIQ = scale(df$SocialIQ)
+
+
+
+
+qav1asd5 = map(
+  alist(
+    ADOS ~ dnorm(m, s),
+    m <- a + b1*VerbalIQ + b2*NonVerbalIQ + b3*SocialIQ,
+    a ~ dnorm(0, 1), 
+    b1 ~ dnorm(19, 6),
+    b2 ~ dnorm(26, 4),
+    b3 ~ dnorm(90, 15),
+    s ~ dunif(0, 1)
+    ) ,
+  data=df)
+
+bah=precis(qav1asd5)
+plot(bah)
+
+qav1asd6 = map(
+  alist(
+    ADOS ~ dnorm(m, s),
+    m <- a + b1*VerbalIQ + b2*SocialIQ,
+    a ~ dnorm(0, 1), 
+    b1 ~ dnorm(19, 6),
+    b2 ~ dnorm(90, 15),
+    s ~ dunif(0, 1)
+    ) ,
+  data=df)
+
+pbb=precis(qav1asd6)
+plot(pbb)
+
+
+```
+
+4. Let's discuss contents:
+4.1. You have three scores for IQ, do they show shared variance? Is that the same in TD and ASD? What does that tell us about IQ?
+4.2. You have explored the relation between IQ and ADOS. How do you explain that relation from a cognitive perspective? N.B. You can present alternative hypotheses.
+
+```{r}
+
+v1T = subset(df, Visit == 1 & ASD == 0)
+v1T$ADOS = scale(v1T$ADOS)
+
+qav1td = map(
+  alist(
+    ADOS ~ dnorm(m, s),
+    m <- a + b1*VerbalIQ + b2*NonVerbalIQ + b3*SocialIQ,
+    a ~ dnorm(0, 1), 
+    b1 ~ dnorm(19, 6),
+    b2 ~ dnorm(26, 4),
+    b3 ~ dnorm(90, 15),
+    s ~ dunif(0, 1)
+    ) ,
+  data=v1T)
+
+ita=precis(qav1td)
+plot(ita)
+
+
+qav1td2 = map(
+  alist(
+    ADOS ~ dnorm(m, s),
+    m <- a + b1*VerbalIQ + b2*SocialIQ,
+    a ~ dnorm(0, 1), 
+    b1 ~ dnorm(19, 6),
+    b2 ~ dnorm(90, 15),
+    s ~ dunif(0, 1)
+    ) ,
+  data=v1T)
+
+itysp=precis(qav1td2)
+plot(itysp)
+
+```
+
+5. Bonus questions: Including measurement errors. 
+5.1. Let's assume that ADOS has a measurement error of 1. How would you model that in any of the previous models? 
+5.2. We know that IQ has an estimated measurement error of 2.12. How would you include that?
+
+```{r}
+
+
+
+```
+
+
+
